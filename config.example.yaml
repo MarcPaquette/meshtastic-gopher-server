@@ -1,0 +1,27 @@
+# Meshtastic Gopher Server Configuration
+
+gopher:
+  # Directory containing your gopher content
+  root_directory: ~/gopher-content
+
+  # Maximum message size (Meshtastic limit is ~230 chars)
+  max_message_size: 230
+
+  # Number of pages to auto-send before prompting for 'n'
+  # Set to 0 to always require 'n' for next page
+  auto_send_threshold: 3
+
+meshtastic:
+  # Connection type: serial, ble, or tcp
+  connection_type: serial
+
+  # Device path, BLE address, or hostname (null for auto-detect serial)
+  device: null
+  # Examples:
+  #   Serial: /dev/ttyUSB0 or /dev/ttyACM0
+  #   BLE: AA:BB:CC:DD:EE:FF
+  #   TCP: 192.168.1.100 or meshtastic.local
+
+session:
+  # Session timeout in minutes (inactive sessions are cleaned up)
+  timeout_minutes: 30
