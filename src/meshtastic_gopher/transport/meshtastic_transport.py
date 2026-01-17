@@ -78,9 +78,9 @@ class MeshtasticTransport(MessageTransport):
             error_reason = routing.get("errorReason", "NONE")
             if error_reason == "NONE":
                 ack_success[0] = True
-                logger.debug(f"ACK received for message to {node_id}")
+                logger.info(f"[{node_id}] ACK received")
             else:
-                logger.warning(f"NAK received for message to {node_id}: {error_reason}")
+                logger.warning(f"[{node_id}] NAK received: {error_reason}")
             ack_event.set()
 
         self._interface.sendText(
@@ -93,7 +93,7 @@ class MeshtasticTransport(MessageTransport):
         if ack_event.wait(timeout=timeout):
             return ack_success[0]
         else:
-            logger.warning(f"ACK timeout after {timeout}s for message to {node_id}")
+            logger.warning(f"[{node_id}] ACK timeout after {timeout}s")
             return False
 
     def send_with_retry(self, node_id: str, message: str, timeout: float = 30.0) -> bool:
@@ -111,7 +111,7 @@ class MeshtasticTransport(MessageTransport):
         if self.send_and_wait_for_ack(node_id, message, timeout):
             return True
 
-        logger.info(f"Retrying message to {node_id}...")
+        logger.info(f"[{node_id}] Retrying message...")
         return self.send_and_wait_for_ack(node_id, message, timeout)
 
     def on_message(self, callback: Callable[[str, str], None]) -> None:

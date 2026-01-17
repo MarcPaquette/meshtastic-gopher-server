@@ -87,7 +87,7 @@ a - All pages
             node_id: The sender's node ID.
             message: The message text.
         """
-        logger.debug(f"Received from {node_id}: {message}")
+        logger.info(f"[{node_id}] Received: {message!r}")
 
         try:
             # Get or create session for this node
@@ -95,6 +95,7 @@ a - All pages
 
             # Parse the command
             command = self.parser.parse(message)
+            logger.info(f"[{node_id}] Command: {command.__class__.__name__}")
 
             # Process command and get response + updated session
             response, new_session = self._process_command(command, session)
@@ -106,7 +107,7 @@ a - All pages
             self._send_response(node_id, response, new_session)
 
         except Exception as e:
-            logger.error(f"Error handling message from {node_id}: {e}")
+            logger.error(f"[{node_id}] Error: {e}")
             self._send_error(node_id, str(e))
 
     def _process_command(
@@ -123,16 +124,20 @@ a - All pages
             Tuple of (response_text, updated_session).
         """
         if isinstance(command, HelpCommand):
+            logger.debug("Showing help text")
             return self.HELP_TEXT, session
 
         if isinstance(command, InvalidCommand):
+            logger.debug(f"Invalid command: {command.original_input}")
             return f"Unknown command: {command.original_input}\nSend ? for help", session
 
         if isinstance(command, HomeCommand):
+            logger.debug("Navigating to home")
             new_session = session.navigate_home()
             return self._show_directory(new_session)
 
         if isinstance(command, BackCommand):
+            logger.debug(f"Navigating back from {session.current_path}")
             new_session = session.navigate_back()
             return self._show_directory(new_session)
 
@@ -158,8 +163,10 @@ a - All pages
             Tuple of (rendered_menu, updated_session).
         """
         path = session.current_path
+        logger.info(f"Listing directory: {path}")
 
         if not self.content_provider.exists(path):
+            logger.warning(f"Path not found: {path}")
             return f"Path not found: {path}", session.navigate_home()
 
         if not self.content_provider.is_directory(path):
@@ -171,6 +178,8 @@ a - All pages
         dirs = sorted([e for e in entries if e.is_dir], key=lambda e: e.name.lower())
         files = sorted([e for e in entries if not e.is_dir], key=lambda e: e.name.lower())
         sorted_entries = dirs + files
+
+        logger.debug(f"Directory has {len(dirs)} dirs, {len(files)} files")
 
         new_session = session.set_listing(sorted_entries)
 
@@ -190,18 +199,21 @@ a - All pages
         Returns:
             Tuple of (content/first_chunk, updated_session).
         """
+        logger.info(f"Reading file: {path}")
         content = self.content_provider.read_file(path)
         chunks = self.chunker.chunk(content)
 
         if not chunks:
+            logger.debug("File is empty")
             return "(empty file)", session
 
         # Single chunk or few chunks - send all
         if len(chunks) <= self.config.auto_send_threshold:
-            # Will send all chunks
+            logger.info(f"Sending file in {len(chunks)} chunk(s) (auto-send)")
             return "\n---\n".join(chunks), session.clear_pagination()
 
         # Many chunks - paginate
+        logger.info(f"File requires pagination: {len(chunks)} pages")
         new_session = session.start_pagination(chunks)
         first_chunk = chunks[0]
         # Send first chunk, then navigation hint as separate message to avoid overflow
@@ -218,10 +230,14 @@ a - All pages
             Tuple of (next_chunk, updated_session).
         """
         if not session.has_pagination():
+            logger.debug("Next requested but no active pagination")
             return "No content to page through", session
 
         pagination = session.pagination
         new_session = session.advance_pagination()
+        page_num = new_session.pagination.current_page + 1
+        total = new_session.pagination.total_pages()
+        logger.info(f"Sending page {page_num}/{total}")
 
         chunk = new_session.pagination.current_chunk()
         if chunk is None:
@@ -230,6 +246,7 @@ a - All pages
         if new_session.pagination.has_next():
             return f"{chunk}\n---\n[n=next, a=all]", new_session
         else:
+            logger.info("Reached end of pagination")
             return f"{chunk}\n---\n[End]", new_session.clear_pagination()
 
     def _handle_all(self, session: Session) -> tuple[str, Session]:
@@ -243,6 +260,7 @@ a - All pages
             Tuple of (all_remaining_chunks, updated_session).
         """
         if not session.has_pagination():
+            logger.debug("All requested but no active pagination")
             return "No content to page through", session
 
         # Collect all remaining chunks
@@ -259,6 +277,8 @@ a - All pages
 
         if not remaining_chunks:
             return "End of content", session.clear_pagination()
+
+        logger.info(f"Sending all remaining {len(remaining_chunks)} page(s)")
 
         # Add [End] marker to last chunk
         remaining_chunks[-1] = f"{remaining_chunks[-1]}\n---\n[End]"
@@ -280,10 +300,12 @@ a - All pages
         entry = session.get_entry_at(index)
 
         if entry is None:
+            logger.debug(f"Invalid selection: {index}")
             return f"Invalid selection: {index}", session
 
         # Resolve the full path
         new_path = session.resolve_path(entry.name)
+        logger.info(f"Selected [{index}]: {entry.name} ({'dir' if entry.is_dir else 'file'})")
 
         if entry.is_dir:
             # Navigate into directory
@@ -321,12 +343,16 @@ a - All pages
                 messages.extend(self.chunker.chunk(part))
 
         # Send messages, waiting for ACK before each subsequent message
+        logger.info(f"[{node_id}] Sending {len(messages)} message(s)")
         timeout = self.config.ack_timeout_seconds
         for i, message in enumerate(messages):
-            logger.debug(f"Sending message {i+1}/{len(messages)} to {node_id} ({len(message)} chars): {message[:50]}...")
+            preview = message[:50].replace('\n', ' ')
+            logger.debug(f"[{node_id}] Message {i+1}/{len(messages)} ({len(message)} chars): {preview}...")
             success = self.transport.send_with_retry(node_id, message, timeout=timeout)
-            if not success:
-                logger.warning(f"Failed to deliver message {i+1}/{len(messages)} to {node_id} after retry")
+            if success:
+                logger.debug(f"[{node_id}] Message {i+1}/{len(messages)} delivered")
+            else:
+                logger.warning(f"[{node_id}] Message {i+1}/{len(messages)} failed after retry")
 
     def _send_error(self, node_id: str, error: str) -> None:
         """Send error message to a node."""
