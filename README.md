@@ -6,7 +6,8 @@ A Gopher-like server for Meshtastic mesh networks. Navigate directories and view
 
 - **Menu-driven navigation** - Browse directories using numbered selections
 - **Per-node sessions** - Each Meshtastic node has independent navigation state
-- **Smart pagination** - Long content is split into ~230 character chunks to fit Meshtastic's message limits
+- **Smart pagination** - Long content is split into ~200 character chunks to fit Meshtastic's message limits
+- **ACK-based delivery** - Reliable message delivery with acknowledgment waiting and retry logic
 - **Multiple connection types** - Serial/USB, Bluetooth LE, and TCP support
 - **Filesystem-based content** - Serve any directory structure as gopher content
 
@@ -49,6 +50,7 @@ meshtastic-gopher -r ~/gopher-content --serial
 | `b` or `back` | Go back to parent directory |
 | `h` or `home` | Return to root directory |
 | `n` or `next` | Show next page of content |
+| `a` or `all` | Send all remaining pages |
 | `?` or `help` | Display help message |
 
 ## Example Session
@@ -109,8 +111,9 @@ Example `config.yaml`:
 ```yaml
 gopher:
   root_directory: ~/gopher-content
-  max_message_size: 230
-  auto_send_threshold: 3  # pages before requiring 'n' for next
+  max_message_size: 200
+  auto_send_threshold: 3   # pages before requiring 'n' for next
+  ack_timeout_seconds: 30  # timeout waiting for message ACK
 
 meshtastic:
   connection_type: serial  # serial, ble, or tcp
