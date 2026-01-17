@@ -152,3 +152,27 @@ class TestFilesystemProvider:
             assert isinstance(entry, Entry)
             assert isinstance(entry.name, str)
             assert isinstance(entry.is_dir, bool)
+
+    def test_init_with_file_raises(self, temp_content_dir):
+        """Initializing with a file path raises ValueError."""
+        file_path = temp_content_dir / "welcome.txt"
+        with pytest.raises(ValueError, match="must be a directory"):
+            FilesystemProvider(file_path)
+
+    def test_init_with_nonexistent_raises(self, tmp_path):
+        """Initializing with nonexistent path raises ValueError."""
+        nonexistent = tmp_path / "does_not_exist"
+        with pytest.raises(ValueError, match="must be a directory"):
+            FilesystemProvider(nonexistent)
+
+    def test_exists_path_traversal_returns_false(self, temp_content_dir):
+        """exists returns False for path traversal attempts."""
+        provider = FilesystemProvider(temp_content_dir)
+        # Path traversal should return False, not raise
+        assert provider.exists("/../../../etc/passwd") is False
+
+    def test_is_directory_path_traversal_returns_false(self, temp_content_dir):
+        """is_directory returns False for path traversal attempts."""
+        provider = FilesystemProvider(temp_content_dir)
+        # Path traversal should return False, not raise
+        assert provider.is_directory("/../../../etc") is False

@@ -32,6 +32,13 @@ class NextCommand(Command):
 
 
 @dataclass(frozen=True)
+class AllCommand(Command):
+    """Command to get all remaining pages of content."""
+
+    pass
+
+
+@dataclass(frozen=True)
 class HomeCommand(Command):
     """Command to go to the root directory."""
 
@@ -62,6 +69,7 @@ class CommandParser:
     # Command mappings
     BACK_COMMANDS = {"b", "back"}
     NEXT_COMMANDS = {"n", "next"}
+    ALL_COMMANDS = {"a", "all"}
     HOME_COMMANDS = {"h", "home"}
     HELP_COMMANDS = {"?", "help"}
 
@@ -89,6 +97,9 @@ class CommandParser:
 
         if cleaned in self.NEXT_COMMANDS:
             return NextCommand()
+
+        if cleaned in self.ALL_COMMANDS:
+            return AllCommand()
 
         if cleaned in self.HOME_COMMANDS:
             return HomeCommand()

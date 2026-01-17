@@ -13,7 +13,7 @@ class TestConfig:
         """Config has sensible defaults."""
         config = Config()
         assert config.root_directory == "~/gopher-content"
-        assert config.max_message_size == 230
+        assert config.max_message_size == 200
         assert config.auto_send_threshold == 3
         assert config.connection_type == "serial"
         assert config.device is None
@@ -79,7 +79,7 @@ gopher:
 
             assert config.root_directory == "/tmp/test"
             # Rest should be defaults
-            assert config.max_message_size == 230
+            assert config.max_message_size == 200
             assert config.connection_type == "serial"
 
     def test_load_empty_file(self):
@@ -91,7 +91,7 @@ gopher:
             config = load_config(f.name)
 
             assert config.root_directory == "~/gopher-content"
-            assert config.max_message_size == 230
+            assert config.max_message_size == 200
 
     def test_load_nonexistent_file_raises(self):
         """Loading nonexistent file raises error."""

@@ -1,6 +1,6 @@
 """Core components for the Meshtastic Gopher Server."""
 
-from .command_parser import CommandParser, Command, SelectCommand, BackCommand, NextCommand, HomeCommand, HelpCommand, InvalidCommand
+from .command_parser import CommandParser, Command, SelectCommand, BackCommand, NextCommand, AllCommand, HomeCommand, HelpCommand, InvalidCommand
 from .content_chunker import ContentChunker
 from .menu_renderer import MenuRenderer
 from .session import Session, PaginationState
@@ -12,6 +12,7 @@ __all__ = [
     "SelectCommand",
     "BackCommand",
     "NextCommand",
+    "AllCommand",
     "HomeCommand",
     "HelpCommand",
     "InvalidCommand",

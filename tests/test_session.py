@@ -16,52 +16,52 @@ class TestPaginationState:
 
     def test_with_chunks(self):
         """PaginationState can be created with chunks."""
-        chunks = ["Page 1", "Page 2", "Page 3"]
+        chunks = ("Page 1", "Page 2", "Page 3")
         state = PaginationState(chunks=chunks, current_page=0)
-        assert list(state.chunks) == chunks
+        assert state.chunks == chunks
         assert state.current_page == 0
 
     def test_has_next_page(self):
         """has_next returns True when more pages exist."""
-        state = PaginationState(chunks=["a", "b", "c"], current_page=0)
+        state = PaginationState(chunks=("a", "b", "c"), current_page=0)
         assert state.has_next() is True
 
     def test_has_next_page_false_at_end(self):
         """has_next returns False on last page."""
-        state = PaginationState(chunks=["a", "b", "c"], current_page=2)
+        state = PaginationState(chunks=("a", "b", "c"), current_page=2)
         assert state.has_next() is False
 
     def test_has_next_empty_chunks(self):
         """has_next returns False for empty chunks."""
-        state = PaginationState(chunks=[], current_page=0)
+        state = PaginationState(chunks=(), current_page=0)
         assert state.has_next() is False
 
     def test_current_chunk(self):
         """current_chunk returns the chunk at current_page."""
-        state = PaginationState(chunks=["a", "b", "c"], current_page=1)
+        state = PaginationState(chunks=("a", "b", "c"), current_page=1)
         assert state.current_chunk() == "b"
 
     def test_current_chunk_empty(self):
         """current_chunk returns None for empty chunks."""
-        state = PaginationState(chunks=[], current_page=0)
+        state = PaginationState(chunks=(), current_page=0)
         assert state.current_chunk() is None
 
     def test_advance(self):
         """advance increments current_page."""
-        state = PaginationState(chunks=["a", "b", "c"], current_page=0)
+        state = PaginationState(chunks=("a", "b", "c"), current_page=0)
         new_state = state.advance()
         assert new_state.current_page == 1
         assert state.current_page == 0  # Original unchanged
 
     def test_advance_at_end(self):
         """advance at end stays at last page."""
-        state = PaginationState(chunks=["a", "b"], current_page=1)
+        state = PaginationState(chunks=("a", "b"), current_page=1)
         new_state = state.advance()
         assert new_state.current_page == 1
 
     def test_total_pages(self):
         """total_pages returns number of chunks."""
-        state = PaginationState(chunks=["a", "b", "c"])
+        state = PaginationState(chunks=("a", "b", "c"))
         assert state.total_pages() == 3
 
 
@@ -89,7 +89,7 @@ class TestSession:
 
     def test_navigate_to_clears_pagination(self):
         """navigate_to clears pagination state."""
-        pagination = PaginationState(chunks=["a", "b"], current_page=0)
+        pagination = PaginationState(chunks=("a", "b"), current_page=0)
         session = Session(current_path="/", pagination=pagination)
         new_session = session.navigate_to("/documents")
         assert new_session.pagination is None
@@ -137,7 +137,7 @@ class TestSession:
 
     def test_advance_pagination(self):
         """advance_pagination moves to next page."""
-        pagination = PaginationState(chunks=["a", "b", "c"], current_page=0)
+        pagination = PaginationState(chunks=("a", "b", "c"), current_page=0)
         session = Session(pagination=pagination)
         new_session = session.advance_pagination()
         assert new_session.pagination.current_page == 1
@@ -150,14 +150,14 @@ class TestSession:
 
     def test_clear_pagination(self):
         """clear_pagination removes pagination state."""
-        pagination = PaginationState(chunks=["a"], current_page=0)
+        pagination = PaginationState(chunks=("a",), current_page=0)
         session = Session(pagination=pagination)
         new_session = session.clear_pagination()
         assert new_session.pagination is None
 
     def test_has_pagination(self):
         """has_pagination returns True when paginating."""
-        pagination = PaginationState(chunks=["a"], current_page=0)
+        pagination = PaginationState(chunks=("a",), current_page=0)
         session = Session(pagination=pagination)
         assert session.has_pagination() is True
 
@@ -168,17 +168,17 @@ class TestSession:
 
     def test_get_entry_at_index(self):
         """get_entry_at returns entry from last_listing."""
-        entries = [
+        entries = (
             Entry(name="first.txt", is_dir=False),
             Entry(name="second.txt", is_dir=False),
-        ]
+        )
         session = Session(last_listing=entries)
         assert session.get_entry_at(1) == entries[0]
         assert session.get_entry_at(2) == entries[1]
 
     def test_get_entry_at_invalid_index(self):
         """get_entry_at returns None for invalid index."""
-        entries = [Entry(name="only.txt", is_dir=False)]
+        entries = (Entry(name="only.txt", is_dir=False),)
         session = Session(last_listing=entries)
         assert session.get_entry_at(0) is None  # 0 is invalid (1-indexed)
         assert session.get_entry_at(2) is None  # Out of range

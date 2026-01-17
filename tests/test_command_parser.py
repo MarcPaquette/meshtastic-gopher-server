@@ -7,6 +7,7 @@ from meshtastic_gopher.core.command_parser import (
     SelectCommand,
     BackCommand,
     NextCommand,
+    AllCommand,
     HomeCommand,
     HelpCommand,
     InvalidCommand,
@@ -78,6 +79,21 @@ class TestCommandParser:
         """'next' returns NextCommand."""
         cmd = parser.parse("next")
         assert isinstance(cmd, NextCommand)
+
+    def test_parse_all_lowercase(self, parser):
+        """'a' returns AllCommand."""
+        cmd = parser.parse("a")
+        assert isinstance(cmd, AllCommand)
+
+    def test_parse_all_uppercase(self, parser):
+        """'A' returns AllCommand."""
+        cmd = parser.parse("A")
+        assert isinstance(cmd, AllCommand)
+
+    def test_parse_all_word(self, parser):
+        """'all' returns AllCommand."""
+        cmd = parser.parse("all")
+        assert isinstance(cmd, AllCommand)
 
     def test_parse_home_lowercase(self, parser):
         """'h' returns HomeCommand."""

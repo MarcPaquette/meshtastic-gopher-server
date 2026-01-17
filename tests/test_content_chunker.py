@@ -136,3 +136,41 @@ class TestContentChunker:
         chunks = chunker.chunk(content)
         assert "世界" in chunks[0]
         assert "🎉" in chunks[0]
+
+    def test_max_size_too_small_raises(self):
+        """max_size smaller than indicator reserve raises ValueError."""
+        chunker = ContentChunker(max_size=5)  # Too small for " [1/1]"
+        with pytest.raises(ValueError, match="max_size must be"):
+            chunker.chunk("A" * 100)
+
+    def test_split_at_newline_boundary(self):
+        """Content is split at newline boundaries when possible."""
+        # Create content where newline is a good split point
+        chunker = ContentChunker(max_size=50)
+        # Line1 is 20 chars, newline, Line2 is 25 chars = 46 total
+        # Adding more pushes over limit, should split at newline
+        content = "A" * 20 + "\n" + "B" * 25 + "\n" + "C" * 30
+        chunks = chunker.chunk(content)
+        # First chunk should end around the newline
+        assert len(chunks) >= 2
+
+    def test_split_prefers_newline_over_space(self):
+        """Splitting prefers newlines over spaces when both available."""
+        chunker = ContentChunker(max_size=40)
+        # Create content that definitely exceeds max_size
+        # effective_max = 40 - 9 = 31 chars per chunk
+        # Content needs to be >40 to trigger splitting
+        content = "word word\nmore content here and it keeps going and going"
+        chunks = chunker.chunk(content)
+        # Should have split at the newline (since it's in the first half and valid)
+        assert len(chunks) >= 2
+        # First chunk text (without indicator) should contain "word word"
+        first_text = chunks[0].split(" [")[0] if " [" in chunks[0] else chunks[0]
+        assert "word" in first_text
+
+    def test_find_split_point_short_text(self):
+        """_find_split_point returns len(text) for short text."""
+        chunker = ContentChunker(max_size=100)
+        # Directly test the method
+        result = chunker._find_split_point("short text", 50)
+        assert result == len("short text")

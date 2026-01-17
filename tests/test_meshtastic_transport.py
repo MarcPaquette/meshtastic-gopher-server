@@ -220,3 +220,210 @@ class TestMeshtasticTransport:
         transport.connect()
         transport.disconnect()
         assert transport.is_connected() is False
+
+    def test_connect_invalid_connection_type_raises(self):
+        """Connect with invalid connection type raises ValueError."""
+        transport = MeshtasticTransport(connection_type="invalid")
+        with pytest.raises(ValueError, match="Unknown connection type"):
+            transport.connect()
+
+    @patch("meshtastic_gopher.transport.meshtastic_transport.serial_interface")
+    def test_send_with_want_ack(self, mock_serial):
+        """send with want_ack=True passes wantAck to sendText."""
+        mock_interface = MagicMock()
+        mock_serial.SerialInterface.return_value = mock_interface
+
+        transport = MeshtasticTransport()
+        transport.connect()
+        transport.send("!abcd1234", "Hello", want_ack=True)
+
+        call_args = mock_interface.sendText.call_args
+        assert call_args[1]["wantAck"] is True
+
+    @patch("meshtastic_gopher.transport.meshtastic_transport.serial_interface")
+    def test_send_and_wait_for_ack_success(self, mock_serial):
+        """send_and_wait_for_ack returns True when ACK received."""
+        mock_interface = MagicMock()
+        mock_serial.SerialInterface.return_value = mock_interface
+
+        # Make sendText call the onResponse callback immediately with ACK
+        def fake_send_text(message, destinationId, wantAck, onResponse):
+            # Simulate successful ACK
+            packet = {"decoded": {"routing": {"errorReason": "NONE"}}}
+            onResponse(packet)
+
+        mock_interface.sendText.side_effect = fake_send_text
+
+        transport = MeshtasticTransport()
+        transport.connect()
+        result = transport.send_and_wait_for_ack("!abcd1234", "Hello", timeout=5.0)
+
+        assert result is True
+
+    @patch("meshtastic_gopher.transport.meshtastic_transport.serial_interface")
+    def test_send_and_wait_for_ack_nak(self, mock_serial):
+        """send_and_wait_for_ack returns False when NAK received."""
+        mock_interface = MagicMock()
+        mock_serial.SerialInterface.return_value = mock_interface
+
+        def fake_send_text(message, destinationId, wantAck, onResponse):
+            # Simulate NAK
+            packet = {"decoded": {"routing": {"errorReason": "NO_ROUTE"}}}
+            onResponse(packet)
+
+        mock_interface.sendText.side_effect = fake_send_text
+
+        transport = MeshtasticTransport()
+        transport.connect()
+        result = transport.send_and_wait_for_ack("!abcd1234", "Hello", timeout=5.0)
+
+        assert result is False
+
+    @patch("meshtastic_gopher.transport.meshtastic_transport.serial_interface")
+    def test_send_and_wait_for_ack_timeout(self, mock_serial):
+        """send_and_wait_for_ack returns False on timeout."""
+        mock_interface = MagicMock()
+        mock_serial.SerialInterface.return_value = mock_interface
+
+        # Don't call onResponse - simulates timeout
+        mock_interface.sendText.return_value = None
+
+        transport = MeshtasticTransport()
+        transport.connect()
+        # Use very short timeout
+        result = transport.send_and_wait_for_ack("!abcd1234", "Hello", timeout=0.01)
+
+        assert result is False
+
+    def test_send_and_wait_for_ack_not_connected_raises(self):
+        """send_and_wait_for_ack raises when not connected."""
+        transport = MeshtasticTransport()
+        with pytest.raises(RuntimeError, match="Not connected"):
+            transport.send_and_wait_for_ack("!abcd1234", "Hello")
+
+    @patch("meshtastic_gopher.transport.meshtastic_transport.serial_interface")
+    def test_send_with_retry_success_first_attempt(self, mock_serial):
+        """send_with_retry returns True on first successful attempt."""
+        mock_interface = MagicMock()
+        mock_serial.SerialInterface.return_value = mock_interface
+
+        def fake_send_text(message, destinationId, wantAck, onResponse):
+            packet = {"decoded": {"routing": {"errorReason": "NONE"}}}
+            onResponse(packet)
+
+        mock_interface.sendText.side_effect = fake_send_text
+
+        transport = MeshtasticTransport()
+        transport.connect()
+        result = transport.send_with_retry("!abcd1234", "Hello", timeout=5.0)
+
+        assert result is True
+        # Should only be called once (no retry needed)
+        assert mock_interface.sendText.call_count == 1
+
+    @patch("meshtastic_gopher.transport.meshtastic_transport.serial_interface")
+    def test_send_with_retry_success_second_attempt(self, mock_serial):
+        """send_with_retry returns True on retry after first failure."""
+        mock_interface = MagicMock()
+        mock_serial.SerialInterface.return_value = mock_interface
+
+        call_count = [0]
+
+        def fake_send_text(message, destinationId, wantAck, onResponse):
+            call_count[0] += 1
+            if call_count[0] == 1:
+                # First call - don't call callback (timeout)
+                pass
+            else:
+                # Second call - success
+                packet = {"decoded": {"routing": {"errorReason": "NONE"}}}
+                onResponse(packet)
+
+        mock_interface.sendText.side_effect = fake_send_text
+
+        transport = MeshtasticTransport()
+        transport.connect()
+        result = transport.send_with_retry("!abcd1234", "Hello", timeout=0.01)
+
+        assert result is True
+        assert mock_interface.sendText.call_count == 2
+
+    @patch("meshtastic_gopher.transport.meshtastic_transport.serial_interface")
+    def test_send_with_retry_both_fail(self, mock_serial):
+        """send_with_retry returns False when both attempts fail."""
+        mock_interface = MagicMock()
+        mock_serial.SerialInterface.return_value = mock_interface
+
+        # Never call onResponse - both attempts timeout
+        mock_interface.sendText.return_value = None
+
+        transport = MeshtasticTransport()
+        transport.connect()
+        result = transport.send_with_retry("!abcd1234", "Hello", timeout=0.01)
+
+        assert result is False
+        assert mock_interface.sendText.call_count == 2
+
+    @patch("meshtastic_gopher.transport.meshtastic_transport.serial_interface")
+    def test_callback_exception_does_not_break_others(self, mock_serial):
+        """Exception in one callback doesn't prevent others from running."""
+        mock_interface = MagicMock()
+        mock_serial.SerialInterface.return_value = mock_interface
+
+        transport = MeshtasticTransport()
+
+        # First callback raises exception
+        bad_callback = Mock(side_effect=Exception("Callback error"))
+        good_callback = Mock()
+
+        transport.on_message(bad_callback)
+        transport.on_message(good_callback)
+        transport.connect()
+
+        packet = {
+            "fromId": "!abcd1234",
+            "decoded": {"text": "Test"},
+        }
+        transport._handle_receive(packet, mock_interface)
+
+        # Both callbacks should have been called
+        bad_callback.assert_called_once()
+        good_callback.assert_called_once()
+
+    @patch("meshtastic_gopher.transport.meshtastic_transport.serial_interface")
+    def test_handle_receive_missing_from_id_ignored(self, mock_serial):
+        """Packets without fromId are ignored."""
+        mock_interface = MagicMock()
+        mock_serial.SerialInterface.return_value = mock_interface
+
+        transport = MeshtasticTransport()
+        callback = Mock()
+        transport.on_message(callback)
+        transport.connect()
+
+        # Packet missing fromId
+        packet = {
+            "decoded": {"text": "Hello"},
+        }
+        transport._handle_receive(packet, mock_interface)
+
+        callback.assert_not_called()
+
+    @patch("meshtastic_gopher.transport.meshtastic_transport.serial_interface")
+    def test_handle_receive_empty_decoded_ignored(self, mock_serial):
+        """Packets with empty decoded section are ignored."""
+        mock_interface = MagicMock()
+        mock_serial.SerialInterface.return_value = mock_interface
+
+        transport = MeshtasticTransport()
+        callback = Mock()
+        transport.on_message(callback)
+        transport.connect()
+
+        packet = {
+            "fromId": "!abcd1234",
+            "decoded": {},
+        }
+        transport._handle_receive(packet, mock_interface)
+
+        callback.assert_not_called()

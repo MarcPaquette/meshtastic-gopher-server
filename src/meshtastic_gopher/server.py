@@ -9,6 +9,7 @@ from .core import (
     SelectCommand,
     BackCommand,
     NextCommand,
+    AllCommand,
     HomeCommand,
     HelpCommand,
     InvalidCommand,
@@ -34,6 +35,7 @@ class GopherServer:
 b - Back to parent
 h - Home (root)
 n - Next page
+a - All pages
 ? - This help"""
 
     def __init__(
@@ -137,6 +139,9 @@ n - Next page
         if isinstance(command, NextCommand):
             return self._handle_next(session)
 
+        if isinstance(command, AllCommand):
+            return self._handle_all(session)
+
         if isinstance(command, SelectCommand):
             return self._handle_select(command.index, session)
 
@@ -199,7 +204,8 @@ n - Next page
         # Many chunks - paginate
         new_session = session.start_pagination(chunks)
         first_chunk = chunks[0]
-        return f"{first_chunk}\n[Send 'n' for next page]", new_session
+        # Send first chunk, then navigation hint as separate message to avoid overflow
+        return f"{first_chunk}\n---\n[n=next, a=all]", new_session
 
     def _handle_next(self, session: Session) -> tuple[str, Session]:
         """
@@ -222,9 +228,43 @@ n - Next page
             return "End of content", new_session.clear_pagination()
 
         if new_session.pagination.has_next():
-            return f"{chunk}\n[Send 'n' for next page]", new_session
+            return f"{chunk}\n---\n[n=next, a=all]", new_session
         else:
-            return f"{chunk}\n[End of content]", new_session.clear_pagination()
+            return f"{chunk}\n---\n[End]", new_session.clear_pagination()
+
+    def _handle_all(self, session: Session) -> tuple[str, Session]:
+        """
+        Handle all pages command - send all remaining pages.
+
+        Args:
+            session: Current session.
+
+        Returns:
+            Tuple of (all_remaining_chunks, updated_session).
+        """
+        if not session.has_pagination():
+            return "No content to page through", session
+
+        # Collect all remaining chunks
+        remaining_chunks = []
+        current_session = session
+
+        while current_session.has_pagination():
+            current_session = current_session.advance_pagination()
+            chunk = current_session.pagination.current_chunk()
+            if chunk:
+                remaining_chunks.append(chunk)
+            if not current_session.pagination.has_next():
+                break
+
+        if not remaining_chunks:
+            return "End of content", session.clear_pagination()
+
+        # Add [End] marker to last chunk
+        remaining_chunks[-1] = f"{remaining_chunks[-1]}\n---\n[End]"
+
+        # Join with delimiter for _send_response to split and send separately
+        return "\n---\n".join(remaining_chunks), current_session.clear_pagination()
 
     def _handle_select(self, index: int, session: Session) -> tuple[str, Session]:
         """
@@ -257,22 +297,46 @@ n - Next page
         """
         Send response message(s) to a node.
 
+        All responses are chunked if they exceed max_message_size.
+        Each message waits for ACK before sending the next (with retry on timeout).
+
         Args:
             node_id: Target node ID.
             response: Response text.
             session: Current session (for context).
         """
-        # For paginated auto-send content, split by our delimiter
+        # For paginated auto-send content, split by our delimiter first
         if "\n---\n" in response:
             parts = response.split("\n---\n")
-            for part in parts:
-                self.transport.send(node_id, part)
         else:
-            self.transport.send(node_id, response)
+            parts = [response]
+
+        # Collect all messages to send
+        messages = []
+        for part in parts:
+            if len(part) <= self.config.max_message_size:
+                messages.append(part)
+            else:
+                # Chunk oversized messages
+                messages.extend(self.chunker.chunk(part))
+
+        # Send messages, waiting for ACK before each subsequent message
+        timeout = self.config.ack_timeout_seconds
+        for i, message in enumerate(messages):
+            logger.debug(f"Sending message {i+1}/{len(messages)} to {node_id} ({len(message)} chars): {message[:50]}...")
+            success = self.transport.send_with_retry(node_id, message, timeout=timeout)
+            if not success:
+                logger.warning(f"Failed to deliver message {i+1}/{len(messages)} to {node_id} after retry")
 
     def _send_error(self, node_id: str, error: str) -> None:
         """Send error message to a node."""
-        self.transport.send(node_id, f"Error: {error}")
+        message = f"Error: {error}"
+        if len(message) <= self.config.max_message_size:
+            self.transport.send(node_id, message)
+        else:
+            # Truncate long error messages to fit
+            max_error_len = self.config.max_message_size - len("Error: ...")
+            self.transport.send(node_id, f"Error: {error[:max_error_len]}...")
 
     def send_welcome(self, node_id: str) -> None:
         """

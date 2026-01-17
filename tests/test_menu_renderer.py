@@ -73,37 +73,19 @@ class TestMenuRenderer:
         lines = [l for l in result.strip().split("\n") if l.strip()]
         assert len(lines) == 4
 
-    def test_directories_sorted_first(self, renderer):
-        """Directories appear before files."""
+    def test_preserves_entry_order(self, renderer):
+        """Renderer preserves the order of entries (sorting is caller's responsibility)."""
         entries = [
-            Entry(name="zebra.txt", is_dir=False),
             Entry(name="alpha", is_dir=True),
-            Entry(name="aardvark.txt", is_dir=False),
             Entry(name="beta", is_dir=True),
+            Entry(name="aardvark.txt", is_dir=False),
+            Entry(name="zebra.txt", is_dir=False),
         ]
         result = renderer.render(entries)
         lines = [l for l in result.strip().split("\n") if l.strip()]
-        # First two should be directories
-        assert "/" in lines[0]  # directory
-        assert "/" in lines[1]  # directory
-        # Last two should be files
-        assert ".txt" in lines[2]
-        assert ".txt" in lines[3]
-
-    def test_alphabetical_within_categories(self, renderer):
-        """Items are sorted alphabetically within dirs/files."""
-        entries = [
-            Entry(name="zebra.txt", is_dir=False),
-            Entry(name="alpha", is_dir=True),
-            Entry(name="aardvark.txt", is_dir=False),
-            Entry(name="beta", is_dir=True),
-        ]
-        result = renderer.render(entries)
-        lines = [l for l in result.strip().split("\n") if l.strip()]
-        # Directories first, alphabetically
+        # Order should be preserved as given
         assert "alpha/" in lines[0]
         assert "beta/" in lines[1]
-        # Files next, alphabetically
         assert "aardvark.txt" in lines[2]
         assert "zebra.txt" in lines[3]
 

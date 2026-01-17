@@ -1,11 +1,15 @@
 """Meshtastic-based message transport."""
 
+import logging
+import threading
 from typing import Callable
 from pubsub import pub
 
 from meshtastic import serial_interface, tcp_interface, ble_interface
 
 from ..interfaces import MessageTransport
+
+logger = logging.getLogger(__name__)
 
 
 class MeshtasticTransport(MessageTransport):
@@ -28,13 +32,14 @@ class MeshtasticTransport(MessageTransport):
         self._interface = None
         self._callbacks: list[Callable[[str, str], None]] = []
 
-    def send(self, node_id: str, message: str) -> None:
+    def send(self, node_id: str, message: str, want_ack: bool = False) -> None:
         """
         Send a message to a specific node.
 
         Args:
             node_id: The destination node ID (e.g., "!abcd1234").
             message: The message text to send.
+            want_ack: If True, request acknowledgment for reliable delivery.
 
         Raises:
             RuntimeError: If not connected.
@@ -42,7 +47,72 @@ class MeshtasticTransport(MessageTransport):
         if self._interface is None:
             raise RuntimeError("Not connected. Call connect() first.")
 
-        self._interface.sendText(message, destinationId=node_id)
+        self._interface.sendText(message, destinationId=node_id, wantAck=want_ack)
+
+    def send_and_wait_for_ack(self, node_id: str, message: str, timeout: float = 30.0) -> bool:
+        """
+        Send a message and wait for acknowledgment.
+
+        Args:
+            node_id: The destination node ID.
+            message: The message text to send.
+            timeout: Maximum seconds to wait for ACK.
+
+        Returns:
+            True if ACK received, False if timeout or NAK.
+
+        Raises:
+            RuntimeError: If not connected.
+        """
+        if self._interface is None:
+            raise RuntimeError("Not connected. Call connect() first.")
+
+        ack_event = threading.Event()
+        ack_success = [False]  # Use list to allow modification in nested function
+
+        # Named 'onAckNak' so meshtastic library will call it for ACK/NAK responses
+        def onAckNak(packet):
+            """Handle ACK/NAK response."""
+            decoded = packet.get("decoded", {})
+            routing = decoded.get("routing", {})
+            error_reason = routing.get("errorReason", "NONE")
+            if error_reason == "NONE":
+                ack_success[0] = True
+                logger.debug(f"ACK received for message to {node_id}")
+            else:
+                logger.warning(f"NAK received for message to {node_id}: {error_reason}")
+            ack_event.set()
+
+        self._interface.sendText(
+            message,
+            destinationId=node_id,
+            wantAck=True,
+            onResponse=onAckNak,
+        )
+
+        if ack_event.wait(timeout=timeout):
+            return ack_success[0]
+        else:
+            logger.warning(f"ACK timeout after {timeout}s for message to {node_id}")
+            return False
+
+    def send_with_retry(self, node_id: str, message: str, timeout: float = 30.0) -> bool:
+        """
+        Send a message with one retry on timeout.
+
+        Args:
+            node_id: The destination node ID.
+            message: The message text to send.
+            timeout: Maximum seconds to wait for ACK per attempt.
+
+        Returns:
+            True if ACK received (on first or second attempt), False otherwise.
+        """
+        if self.send_and_wait_for_ack(node_id, message, timeout):
+            return True
+
+        logger.info(f"Retrying message to {node_id}...")
+        return self.send_and_wait_for_ack(node_id, message, timeout)
 
     def on_message(self, callback: Callable[[str, str], None]) -> None:
         """

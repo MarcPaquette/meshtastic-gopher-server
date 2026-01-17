@@ -16,11 +16,8 @@ class MenuRenderer:
         """
         Render a list of entries as a numbered menu.
 
-        Directories are listed first (with trailing /), then files.
-        Both are sorted alphabetically within their category.
-
         Args:
-            entries: List of Entry objects to render.
+            entries: List of Entry objects to render (should be pre-sorted).
             current_path: Optional path to show as header.
             include_hints: Whether to include navigation hints.
             max_entries: Maximum entries to show (None for all).
@@ -31,15 +28,11 @@ class MenuRenderer:
         if not entries:
             return "(empty)"
 
-        # Sort: directories first, then files, alphabetically within each
-        dirs = sorted([e for e in entries if e.is_dir], key=lambda e: e.name.lower())
-        files = sorted([e for e in entries if not e.is_dir], key=lambda e: e.name.lower())
-        sorted_entries = dirs + files
-
         # Apply max_entries limit
+        display_entries = entries
         truncated = False
-        if max_entries is not None and len(sorted_entries) > max_entries:
-            sorted_entries = sorted_entries[:max_entries]
+        if max_entries is not None and len(entries) > max_entries:
+            display_entries = entries[:max_entries]
             truncated = True
 
         lines = []
@@ -49,7 +42,7 @@ class MenuRenderer:
             lines.append(f"[{current_path}]")
 
         # Render each entry with number
-        for i, entry in enumerate(sorted_entries, 1):
+        for i, entry in enumerate(display_entries, 1):
             name = f"{entry.name}/" if entry.is_dir else entry.name
             lines.append(f"{i}. {name}")
 

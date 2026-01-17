@@ -4,12 +4,16 @@ gopher:
   # Directory containing your gopher content
   root_directory: ~/gopher-content
 
-  # Maximum message size (Meshtastic limit is ~230 chars)
-  max_message_size: 230
+  # Maximum message size (conservative limit for Meshtastic)
+  max_message_size: 200
 
   # Number of pages to auto-send before prompting for 'n'
   # Set to 0 to always require 'n' for next page
   auto_send_threshold: 3
+
+  # Timeout in seconds for waiting for message acknowledgment
+  # Each message waits for ACK before sending the next
+  ack_timeout_seconds: 30.0
 
 meshtastic:
   # Connection type: serial, ble, or tcp

@@ -4,6 +4,7 @@ import argparse
 import logging
 import signal
 import sys
+from dataclasses import replace
 from pathlib import Path
 
 from .config import Config, load_config
@@ -98,43 +99,15 @@ def main() -> int:
 
     # Override config with command line arguments
     if args.root:
-        config = Config(
-            root_directory=args.root,
-            max_message_size=config.max_message_size,
-            auto_send_threshold=config.auto_send_threshold,
-            connection_type=config.connection_type,
-            device=config.device,
-            session_timeout_minutes=config.session_timeout_minutes,
-        )
+        config = replace(config, root_directory=args.root)
 
     if args.serial is not None:
         device = None if args.serial == "auto" else args.serial
-        config = Config(
-            root_directory=config.root_directory,
-            max_message_size=config.max_message_size,
-            auto_send_threshold=config.auto_send_threshold,
-            connection_type="serial",
-            device=device,
-            session_timeout_minutes=config.session_timeout_minutes,
-        )
+        config = replace(config, connection_type="serial", device=device)
     elif args.ble:
-        config = Config(
-            root_directory=config.root_directory,
-            max_message_size=config.max_message_size,
-            auto_send_threshold=config.auto_send_threshold,
-            connection_type="ble",
-            device=args.ble,
-            session_timeout_minutes=config.session_timeout_minutes,
-        )
+        config = replace(config, connection_type="ble", device=args.ble)
     elif args.tcp:
-        config = Config(
-            root_directory=config.root_directory,
-            max_message_size=config.max_message_size,
-            auto_send_threshold=config.auto_send_threshold,
-            connection_type="tcp",
-            device=args.tcp,
-            session_timeout_minutes=config.session_timeout_minutes,
-        )
+        config = replace(config, connection_type="tcp", device=args.tcp)
 
     # Validate root directory
     root_path = config.get_root_path()
