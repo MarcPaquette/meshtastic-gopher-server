@@ -1,7 +1,7 @@
 """Integration tests for GopherServer."""
 
 import pytest
-from unittest.mock import Mock, MagicMock
+from unittest.mock import Mock
 from meshtastic_gopher.server import GopherServer
 from meshtastic_gopher.providers import FilesystemProvider
 from meshtastic_gopher.config import Config

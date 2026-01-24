@@ -1,6 +1,5 @@
 """Tests for the SessionManager module."""
 
-import pytest
 import time
 from meshtastic_gopher.core.session_manager import SessionManager
 from meshtastic_gopher.core.session import Session

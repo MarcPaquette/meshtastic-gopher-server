@@ -1,10 +1,8 @@
 """Tests for the CLI module."""
 
-import argparse
 import logging
 import pytest
 from unittest.mock import patch, MagicMock
-from pathlib import Path
 
 from meshtastic_gopher.cli import setup_logging, parse_args, main
 

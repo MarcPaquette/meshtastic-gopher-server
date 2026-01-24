@@ -3,7 +3,6 @@
 import pytest
 from meshtastic_gopher.core.command_parser import (
     CommandParser,
-    Command,
     SelectCommand,
     BackCommand,
     NextCommand,

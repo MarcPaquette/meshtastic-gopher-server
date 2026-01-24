@@ -1,9 +1,8 @@
 """GopherServer - Main orchestrator for the Meshtastic Gopher Server."""
 
 import logging
-from typing import Protocol
 
-from .interfaces import ContentProvider, MessageTransport, Entry
+from .interfaces import ContentProvider, MessageTransport
 from .core import (
     CommandParser,
     SelectCommand,
@@ -233,7 +232,6 @@ a - All pages
             logger.debug("Next requested but no active pagination")
             return "No content to page through", session
 
-        pagination = session.pagination
         new_session = session.advance_pagination()
         page_num = new_session.pagination.current_page + 1
         total = new_session.pagination.total_pages()

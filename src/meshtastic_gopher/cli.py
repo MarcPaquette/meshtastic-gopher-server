@@ -5,7 +5,6 @@ import logging
 import signal
 import sys
 from dataclasses import replace
-from pathlib import Path
 
 from .config import Config, load_config
 from .providers import FilesystemProvider
@@ -142,7 +141,7 @@ def main() -> int:
     signal.signal(signal.SIGTERM, signal_handler)
 
     # Start server
-    logger.info(f"Starting Gopher server...")
+    logger.info("Starting Gopher server...")
     logger.info(f"  Content directory: {root_path}")
     logger.info(f"  Connection: {config.connection_type}" + (f" ({config.device})" if config.device else ""))
     logger.info(f"  Max message size: {config.max_message_size}")

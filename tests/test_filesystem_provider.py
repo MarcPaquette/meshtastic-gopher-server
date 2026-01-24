@@ -1,7 +1,6 @@
 """Tests for the FilesystemProvider module."""
 
 import pytest
-from pathlib import Path
 from meshtastic_gopher.providers.filesystem_provider import FilesystemProvider
 from meshtastic_gopher.interfaces import Entry
 

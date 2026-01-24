@@ -61,7 +61,7 @@ class TestMenuRenderer:
         result = renderer.render(sample_entries)
         lines = result.strip().split("\n")
         # Find lines with files
-        file_lines = [l for l in lines if "readme.txt" in l or "config.yaml" in l]
+        file_lines = [line for line in lines if "readme.txt" in line or "config.yaml" in line]
         for line in file_lines:
             # Should not end with slash (after the filename)
             assert not line.rstrip().endswith("txt/")
@@ -70,7 +70,7 @@ class TestMenuRenderer:
     def test_entries_on_separate_lines(self, renderer, sample_entries):
         """Each entry is on a separate line."""
         result = renderer.render(sample_entries)
-        lines = [l for l in result.strip().split("\n") if l.strip()]
+        lines = [line for line in result.strip().split("\n") if line.strip()]
         assert len(lines) == 4
 
     def test_preserves_entry_order(self, renderer):
@@ -82,7 +82,7 @@ class TestMenuRenderer:
             Entry(name="zebra.txt", is_dir=False),
         ]
         result = renderer.render(entries)
-        lines = [l for l in result.strip().split("\n") if l.strip()]
+        lines = [line for line in result.strip().split("\n") if line.strip()]
         # Order should be preserved as given
         assert "alpha/" in lines[0]
         assert "beta/" in lines[1]
@@ -99,7 +99,7 @@ class TestMenuRenderer:
         """Navigation hints not included by default."""
         result = renderer.render(sample_entries)
         # Just entries, no extra hints
-        lines = [l for l in result.strip().split("\n") if l.strip()]
+        lines = [line for line in result.strip().split("\n") if line.strip()]
         # Should only have 4 lines (the entries)
         assert len(lines) == 4
 
@@ -129,7 +129,7 @@ class TestMenuRenderer:
         """Can limit the number of entries shown."""
         entries = [Entry(name=f"file{i}.txt", is_dir=False) for i in range(20)]
         result = renderer.render(entries, max_entries=5)
-        lines = [l for l in result.strip().split("\n") if l.strip() and l[0].isdigit()]
+        lines = [line for line in result.strip().split("\n") if line.strip() and line[0].isdigit()]
         assert len(lines) <= 5
         # Should indicate more entries exist
         assert "more" in result.lower() or "..." in result

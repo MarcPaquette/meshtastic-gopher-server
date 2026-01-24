@@ -1,6 +1,5 @@
 """Tests for the Session module."""
 
-import pytest
 from meshtastic_gopher.core.session import Session, PaginationState
 from meshtastic_gopher.interfaces import Entry
 
